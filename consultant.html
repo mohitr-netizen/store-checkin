@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>CaratLane — Consultant Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f3ff;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header .brand { font-size: 16px; font-weight: 700; }
+    header .store-tag {
+      font-size: 11px;
+      background: #8863FB;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    header .jc-name {
+      font-size: 12px;
+      color: #aaa;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .toolbar {
+      background: white;
+      border-bottom: 1px solid #eee;
+      padding: 12px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .store-select {
+      flex: 1;
+      padding: 10px 12px;
+      border: 2px solid #e8e2ff;
+      border-radius: 10px;
+      font-size: 14px;
+      background: white;
+      color: #1a1a2e;
+      outline: none;
+    }
+    .btn-scan {
+      padding: 10px 16px;
+      background: #8863FB;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-scan:active { opacity: 0.85; }
+
+    #file-input { display: none; }
+    canvas { display: none; }
+
+    .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #999;
+      margin-bottom: 12px;
+      margin-top: 24px;
+    }
+
+    .empty-msg {
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      color: #bbb;
+      font-size: 14px;
+    }
+
+    /* Check-in card */
+    .checkin-card {
+      background: white;
+      border-radius: 16px;
+      padding: 18px 20px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .checkin-card.in-progress { border-left: 4px solid #8863FB; }
+    .checkin-card.waiting     { border-left: 4px solid #e8e2ff; }
+
+    .card-info { flex: 1; }
+    .card-name { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 3px; }
+    .card-phone { font-size: 13px; color: #888; margin-bottom: 3px; }
+    .card-time  { font-size: 12px; color: #aaa; }
+    .card-consultant { font-size: 12px; color: #8863FB; font-weight: 600; margin-top: 4px; }
+
+    .card-actions { display: flex; flex-direction: column; gap: 8px; }
+
+    .btn-take {
+      padding: 10px 18px;
+      background: #8863FB;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-take:active { opacity: 0.85; }
+
+    .btn-checkout {
+      padding: 10px 18px;
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-checkout:active { opacity: 0.85; }
+
+    .btn-release {
+      padding: 8px 14px;
+      background: #f5f3ff;
+      color: #8863FB;
+      border: none;
+      border-radius: 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* Scan feedback */
+    #scan-feedback {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a2e;
+      color: white;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 999;
+      display: none;
+      white-space: nowrap;
+    }
+
+    /* Consultant modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal {
+      background: white;
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .modal h2 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+    .modal p  { font-size: 14px; color: #888; margin-bottom: 20px; }
+    .modal input {
+      width: 100%; padding: 14px 16px;
+      font-size: 15px; border: 2px solid #e8e2ff;
+      border-radius: 12px; outline: none; margin-bottom: 16px;
+    }
+    .modal input:focus { border-color: #8863FB; }
+    .modal .btn-primary {
+      width: 100%; padding: 16px;
+      background: #8863FB; color: white;
+      border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer;
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: #27ae60;
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand">CaratLane POS</div>
+  </div>
+  <div class="store-tag" id="header-store">Loading...</div>
+  <div class="jc-name" id="header-jc" onclick="changeConsultant()">...</div>
+</header>
+
+<div class="toolbar">
+  <select class="store-select" id="store-select" onchange="changeStore()">
+    <option value="dallas">Dallas</option>
+    <option value="edison">Edison</option>
+    <option value="trunk-show">Trunk Show</option>
+  </select>
+  <button class="btn-scan" onclick="openScanner()">Scan Customer QR</button>
+  <input type="file" id="file-input" accept="image/*" capture="environment" onchange="handleScan(event)" />
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="wrap">
+  <div id="section-inprogress">
+    <div class="section-title"><span class="live-dot"></span>My Customers — In Progress</div>
+    <div id="list-inprogress"><div class="empty-msg">No active customers</div></div>
+  </div>
+
+  <div id="section-waiting">
+    <div class="section-title"><span class="live-dot"></span>Waiting Queue <span id="queue-count"></span></div>
+    <div id="list-waiting"><div class="empty-msg">Queue is empty</div></div>
+  </div>
+</div>
+
+<div id="scan-feedback"></div>
+
+<!-- Consultant modal -->
+<div class="modal-overlay" id="modal-consultant">
+  <div class="modal">
+    <h2>Who are you?</h2>
+    <p>Enter your CaratLane email to get started.</p>
+    <input type="email" id="modal-email" placeholder="e.g. jc@caratlane.com"
+      value="DallasTexas@caratlane.us" />
+    <button class="btn-primary" onclick="saveConsultant()">Continue</button>
+  </div>
+</div>
+
+<script>
+  var SUPABASE_URL = 'https://sazlkppprwoctfwjhfqj.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhemxrcHBwcndvY3Rmd2poZnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTUyNDIsImV4cCI6MjA5MDYzMTI0Mn0.4x3tYIhvuvW8s0lcLdZlQsbKFpaZaAEJbWEEtpjgPZQ';
+
+  var db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  var consultantId = localStorage.getItem('cl_consultant') || '';
+  var storeSlug    = localStorage.getItem('cl_store') || 'dallas';
+  var channel      = null;
+
+  var STORE_NAMES = {
+    'dallas':     'CaratLane Dallas',
+    'edison':     'CaratLane Edison',
+    'trunk-show': 'CaratLane Trunk Show'
+  };
+
+  // ---- Init ----
+  function init() {
+    // Check if opened with a token (from customer QR scan)
+    var params = new URLSearchParams(window.location.search);
+    var token  = params.get('token');
+
+    if (!consultantId) {
+      document.getElementById('modal-consultant').style.display = 'flex';
+      if (token) localStorage.setItem('cl_pending_token', token);
+    } else {
+      document.getElementById('modal-consultant').style.display = 'none';
+      setupDashboard();
+      if (token) handleTokenLookup(token);
+    }
+  }
+
+  function saveConsultant() {
+    var email = document.getElementById('modal-email').value.trim();
+    if (!email) return;
+    consultantId = email;
+    localStorage.setItem('cl_consultant', email);
+    document.getElementById('modal-consultant').style.display = 'none';
+    setupDashboard();
+
+    var pending = localStorage.getItem('cl_pending_token');
+    if (pending) { localStorage.removeItem('cl_pending_token'); handleTokenLookup(pending); }
+  }
+
+  function changeConsultant() {
+    document.getElementById('modal-email').value = consultantId;
+    document.getElementById('modal-consultant').style.display = 'flex';
+  }
+
+  function setupDashboard() {
+    var select = document.getElementById('store-select');
+    select.value = storeSlug;
+    updateHeader();
+    loadQueue();
+    subscribeRealtime();
+  }
+
+  function updateHeader() {
+    document.getElementById('header-store').textContent = STORE_NAMES[storeSlug] || storeSlug;
+    document.getElementById('header-jc').textContent    = consultantId;
+    document.title = 'Dashboard — ' + (STORE_NAMES[storeSlug] || storeSlug);
+  }
+
+  function changeStore() {
+    storeSlug = document.getElementById('store-select').value;
+    localStorage.setItem('cl_store', storeSlug);
+    updateHeader();
+    if (channel) { db.removeChannel(channel); channel = null; }
+    loadQueue();
+    subscribeRealtime();
+  }
+
+  // ---- Load Queue ----
+  async function loadQueue() {
+    var { data, error } = await db.from('checkins')
+      .select('*')
+      .eq('store_slug', storeSlug)
+      .in('status', ['waiting', 'in_progress'])
+      .order('created_at', { ascending: true });
+
+    if (error) { console.error(error); return; }
+
+    renderQueue(data || []);
+  }
+
+  function renderQueue(checkins) {
+    var waiting    = checkins.filter(function(c) { return c.status === 'waiting'; });
+    var inProgress = checkins.filter(function(c) { return c.status === 'in_progress'; });
+    var myActive   = inProgress.filter(function(c) { return c.consultant_id === consultantId; });
+
+    // Count
+    document.getElementById('queue-count').textContent = waiting.length > 0 ? '(' + waiting.length + ')' : '';
+
+    // In-progress (my customers)
+    var ipEl = document.getElementById('list-inprogress');
+    if (myActive.length === 0) {
+      ipEl.innerHTML = '<div class="empty-msg">No active customers</div>';
+    } else {
+      ipEl.innerHTML = myActive.map(function(c) { return renderCard(c, 'in_progress'); }).join('');
+    }
+
+    // Waiting queue
+    var wEl = document.getElementById('list-waiting');
+    if (waiting.length === 0) {
+      wEl.innerHTML = '<div class="empty-msg">Queue is empty ✓</div>';
+    } else {
+      wEl.innerHTML = waiting.map(function(c, i) { return renderCard(c, 'waiting', i + 1); }).join('');
+    }
+  }
+
+  function renderCard(c, type, position) {
+    var waitMins = Math.floor((Date.now() - new Date(c.created_at)) / 60000);
+    var waitStr  = waitMins < 1 ? 'Just arrived' : waitMins + ' min ago';
+    var name     = c.first_name + ' ' + c.last_name;
+
+    var actions = '';
+    if (type === 'waiting') {
+      actions = '<button class="btn-take" onclick="takeCheckin(\'' + c.id + '\')">Take</button>';
+    } else if (type === 'in_progress') {
+      actions = '<button class="btn-checkout" onclick="checkoutCheckin(\'' + c.id + '\')">Check Out</button>'
+              + '<button class="btn-release" onclick="releaseCheckin(\'' + c.id + '\')">Release</button>';
+    }
+
+    var posTag = position ? '<span style="font-size:11px;background:#f5f3ff;color:#8863FB;padding:2px 8px;border-radius:8px;font-weight:600;">#' + position + '</span> ' : '';
+    var consultantTag = type === 'in_progress' ? '<div class="card-consultant">With: ' + c.consultant_id + '</div>' : '';
+
+    return '<div class="checkin-card ' + type + '">'
+      + '<div class="card-info">'
+      + '<div class="card-name">' + posTag + name + '</div>'
+      + '<div class="card-phone">' + c.phone + '</div>'
+      + '<div class="card-time">' + waitStr + '</div>'
+      + consultantTag
+      + '</div>'
+      + '<div class="card-actions">' + actions + '</div>'
+      + '</div>';
+  }
+
+  // ---- Actions ----
+  async function takeCheckin(id) {
+    var { error } = await db.from('checkins').update({
+      status:        'in_progress',
+      consultant_id: consultantId,
+      updated_at:    new Date().toISOString()
+    }).eq('id', id);
+
+    if (!error) loadQueue();
+  }
+
+  async function checkoutCheckin(id) {
+    var { error } = await db.from('checkins').update({
+      status:     'completed',
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
+
+    if (!error) loadQueue();
+  }
+
+  async function releaseCheckin(id) {
+    var { error } = await db.from('checkins').update({
+      status:        'waiting',
+      consultant_id: 'DallasTexas@caratlane.us',
+      updated_at:    new Date().toISOString()
+    }).eq('id', id);
+
+    if (!error) loadQueue();
+  }
+
+  // ---- Token lookup (from QR scan) ----
+  async function handleTokenLookup(token) {
+    var { data, error } = await db.from('checkins').select('*').eq('token', token).single();
+    if (error || !data) { showFeedback('Check-in not found', 3000); return; }
+
+    if (data.status === 'waiting') {
+      await takeCheckin(data.id);
+      showFeedback('Taken: ' + data.first_name + ' ' + data.last_name, 3000);
+    } else if (data.status === 'in_progress') {
+      showFeedback(data.first_name + ' is already with ' + data.consultant_id, 3000);
+    } else {
+      showFeedback(data.first_name + ' is already checked out', 3000);
+    }
+  }
+
+  // ---- QR Scanner ----
+  function openScanner() {
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-input').click();
+  }
+
+  function handleScan(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.getElementById('canvas');
+        var ctx    = canvas.getContext('2d');
+        canvas.width  = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+
+        if (code) {
+          // Extract token from URL or use raw value
+          var token = code.data;
+          var match = token.match(/[?&]token=([^&]+)/);
+          if (match) token = match[1];
+          handleTokenLookup(token);
+        } else {
+          showFeedback('Could not read QR code. Try again.', 2500);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ---- Realtime ----
+  function subscribeRealtime() {
+    channel = db.channel('consultant-' + storeSlug)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'checkins',
+        filter: 'store_slug=eq.' + storeSlug
+      }, function() {
+        loadQueue();
+      })
+      .subscribe();
+  }
+
+  // ---- Feedback toast ----
+  function showFeedback(msg, duration) {
+    var el = document.getElementById('scan-feedback');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function() { el.style.display = 'none'; }, duration || 2500);
+  }
+
+  init();
+</script>
+
+</body>
+</html>

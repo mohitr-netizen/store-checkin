@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>CaratLane Check-in</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f3ff;
+      min-height: 100vh;
+    }
+    header {
+      background: #8863FB;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    header .store-name { font-size: 13px; opacity: 0.8; margin-bottom: 4px; }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+
+    .wrap { max-width: 480px; margin: 0 auto; padding: 32px 20px 48px; }
+
+    /* ---- States ---- */
+    .state { display: none; }
+    .state.active { display: block; }
+
+    /* Form */
+    .welcome-text { text-align: center; margin-bottom: 28px; }
+    .welcome-text h2 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+    .welcome-text p  { font-size: 14px; color: #888; }
+
+    .field { margin-bottom: 16px; }
+    .field input {
+      width: 100%; padding: 16px;
+      font-size: 16px; border: 2px solid #e8e2ff;
+      border-radius: 12px; outline: none;
+      background: white; color: #1a1a2e;
+    }
+    .field input:focus { border-color: #8863FB; }
+    .field input::placeholder { color: #bbb; }
+
+    .btn-primary {
+      width: 100%; padding: 18px;
+      background: #8863FB; color: white;
+      border: none; border-radius: 14px;
+      font-size: 17px; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+    }
+    .btn-primary:active { opacity: 0.85; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* Queue */
+    .queue-card {
+      background: white; border-radius: 20px;
+      padding: 32px 24px; text-align: center;
+      box-shadow: 0 4px 24px rgba(136,99,251,0.1);
+      margin-bottom: 20px;
+    }
+    .queue-card .hi { font-size: 18px; color: #555; margin-bottom: 4px; }
+    .queue-card .checked-in { font-size: 14px; color: #8863FB; font-weight: 600; margin-bottom: 28px; }
+
+    .queue-number {
+      font-size: 80px; font-weight: 800;
+      color: #8863FB; line-height: 1;
+      margin-bottom: 8px;
+    }
+    .queue-label { font-size: 16px; color: #888; margin-bottom: 28px; }
+    .queue-label span { color: #1a1a2e; font-weight: 600; }
+
+    .divider { border: none; border-top: 1px solid #f0ebff; margin: 24px 0; }
+
+    .qr-wrap { margin: 0 auto; }
+    .qr-wrap img { width: 180px; height: 180px; border-radius: 12px; }
+    .qr-hint { font-size: 12px; color: #aaa; margin-top: 10px; }
+
+    .refresh-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: #aaa; margin-top: 20px;
+    }
+    .dot {
+      width: 7px; height: 7px; background: #8863FB;
+      border-radius: 50%; animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* In Progress */
+    .served-card {
+      background: white; border-radius: 20px;
+      padding: 40px 24px; text-align: center;
+      box-shadow: 0 4px 24px rgba(39,174,96,0.12);
+      border-top: 4px solid #27ae60;
+    }
+    .served-icon { font-size: 56px; margin-bottom: 16px; }
+    .served-card h2 { font-size: 24px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
+    .served-card p  { font-size: 15px; color: #666; line-height: 1.6; }
+    .consultant-name { color: #8863FB; font-weight: 600; }
+
+    /* Completed */
+    .thanks-card {
+      background: white; border-radius: 20px;
+      padding: 40px 24px; text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .thanks-card .icon { font-size: 56px; margin-bottom: 16px; }
+    .thanks-card h2 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
+    .thanks-card p  { font-size: 14px; color: #888; }
+
+    /* Error */
+    .error-msg { background: #fff0f0; border: 1px solid #ffcdd2; border-radius: 10px; padding: 14px 16px; color: #c0392b; font-size: 14px; margin-top: 12px; display: none; }
+
+    /* Store not found */
+    .not-found { text-align: center; padding: 60px 20px; color: #888; }
+    .not-found h2 { font-size: 20px; color: #1a1a2e; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="store-name" id="store-label">Loading...</div>
+  <h1>CaratLane</h1>
+</header>
+
+<div class="wrap">
+
+  <!-- STATE: Loading -->
+  <div id="state-loading" class="state active" style="text-align:center;padding:60px 0;color:#888;">
+    Loading...
+  </div>
+
+  <!-- STATE: Store not found -->
+  <div id="state-notfound" class="state">
+    <div class="not-found">
+      <h2>Store not found</h2>
+      <p>Please scan the QR code at the store entrance.</p>
+    </div>
+  </div>
+
+  <!-- STATE: Form -->
+  <div id="state-form" class="state">
+    <div class="welcome-text">
+      <h2>Welcome!</h2>
+      <p>Check in to get started. We'll be with you shortly.</p>
+    </div>
+    <div class="field">
+      <input type="text" id="inp-firstname" placeholder="First Name" autocomplete="given-name" />
+    </div>
+    <div class="field">
+      <input type="text" id="inp-lastname" placeholder="Last Name" autocomplete="family-name" />
+    </div>
+    <div class="field">
+      <input type="tel" id="inp-phone" placeholder="Phone Number" autocomplete="tel" />
+    </div>
+    <button class="btn-primary" id="btn-checkin" onclick="submitCheckin()">Check In</button>
+    <div class="error-msg" id="form-error"></div>
+  </div>
+
+  <!-- STATE: Queue -->
+  <div id="state-queue" class="state">
+    <div class="queue-card">
+      <div class="hi" id="q-greeting">Hi there!</div>
+      <div class="checked-in">✓ You're checked in</div>
+      <div class="queue-number" id="q-number">0</div>
+      <div class="queue-label" id="q-label"><span>0</span> people ahead of you</div>
+      <hr class="divider" />
+      <div class="qr-wrap">
+        <img id="q-qr" src="" alt="Your check-in QR" />
+        <p class="qr-hint">Show this QR to your consultant</p>
+      </div>
+      <div class="refresh-badge">
+        <div class="dot"></div> Live queue updates
+      </div>
+    </div>
+  </div>
+
+  <!-- STATE: In Progress -->
+  <div id="state-inprogress" class="state">
+    <div class="served-card">
+      <div class="served-icon">💎</div>
+      <h2>It's your turn!</h2>
+      <p>Your consultant <span class="consultant-name" id="ip-consultant"></span><br/>is ready for you.<br/><br/>Please make your way to the counter.</p>
+    </div>
+  </div>
+
+  <!-- STATE: Completed -->
+  <div id="state-completed" class="state">
+    <div class="thanks-card">
+      <div class="icon">🙏</div>
+      <h2>Thank you for visiting CaratLane!</h2>
+      <p>We hope to see you again soon.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var SUPABASE_URL = 'https://sazlkppprwoctfwjhfqj.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhemxrcHBwcndvY3Rmd2poZnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTUyNDIsImV4cCI6MjA5MDYzMTI0Mn0.4x3tYIhvuvW8s0lcLdZlQsbKFpaZaAEJbWEEtpjgPZQ';
+
+  var db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  var storeSlug    = '';
+  var storeName    = '';
+  var checkinId    = null;
+  var checkinToken = null;
+  var channel      = null;
+
+  // ---- Init ----
+  async function init() {
+    var params = new URLSearchParams(window.location.search);
+    storeSlug  = params.get('store') || '';
+
+    if (!storeSlug) {
+      // Try to resume from localStorage
+      var saved = localStorage.getItem('cl_checkin');
+      if (saved) {
+        var data = JSON.parse(saved);
+        storeSlug    = data.store_slug;
+        checkinId    = data.id;
+        checkinToken = data.token;
+        storeName    = data.store_name;
+        document.getElementById('store-label').textContent = storeName;
+        await resumeCheckin();
+        return;
+      }
+      showState('notfound');
+      return;
+    }
+
+    var { data: store, error } = await db.from('stores').select('*').eq('slug', storeSlug).single();
+    if (error || !store) { showState('notfound'); return; }
+
+    storeName = store.name;
+    document.getElementById('store-label').textContent = storeName;
+    document.title = 'Check-in — ' + storeName;
+
+    // Check for saved check-in for this store
+    var saved = localStorage.getItem('cl_checkin');
+    if (saved) {
+      var data = JSON.parse(saved);
+      if (data.store_slug === storeSlug) {
+        checkinId    = data.id;
+        checkinToken = data.token;
+        await resumeCheckin();
+        return;
+      }
+    }
+
+    showState('form');
+  }
+
+  async function resumeCheckin() {
+    var { data, error } = await db.from('checkins').select('*').eq('id', checkinId).single();
+    if (error || !data) { localStorage.removeItem('cl_checkin'); showState('form'); return; }
+    handleCheckinState(data);
+  }
+
+  // ---- Submit ----
+  async function submitCheckin() {
+    var firstName = document.getElementById('inp-firstname').value.trim();
+    var lastName  = document.getElementById('inp-lastname').value.trim();
+    var phone     = document.getElementById('inp-phone').value.trim();
+    var errorEl   = document.getElementById('form-error');
+
+    errorEl.style.display = 'none';
+
+    if (!firstName || !lastName || !phone) {
+      errorEl.textContent = 'Please fill in all fields.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    var btn = document.getElementById('btn-checkin');
+    btn.disabled = true;
+    btn.textContent = 'Checking in...';
+
+    var { data, error } = await db.from('checkins').insert({
+      store_slug: storeSlug,
+      first_name: firstName,
+      last_name:  lastName,
+      phone:      phone,
+      status:     'waiting',
+      consultant_id: 'DallasTexas@caratlane.us'
+    }).select().single();
+
+    if (error) {
+      errorEl.textContent = 'Something went wrong. Please try again.';
+      errorEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Check In';
+      return;
+    }
+
+    checkinId    = data.id;
+    checkinToken = data.token;
+
+    localStorage.setItem('cl_checkin', JSON.stringify({
+      id: data.id, token: data.token,
+      store_slug: storeSlug, store_name: storeName
+    }));
+
+    handleCheckinState(data);
+    subscribeToCheckin();
+  }
+
+  // ---- State handler ----
+  function handleCheckinState(data) {
+    if (data.status === 'waiting') {
+      showQueueState(data);
+    } else if (data.status === 'in_progress') {
+      document.getElementById('ip-consultant').textContent = data.consultant_id || 'your consultant';
+      showState('inprogress');
+    } else if (data.status === 'completed') {
+      localStorage.removeItem('cl_checkin');
+      showState('completed');
+    }
+  }
+
+  async function showQueueState(data) {
+    document.getElementById('q-greeting').textContent = 'Hi ' + data.first_name + '!';
+
+    // Generate QR
+    var qrData = window.location.origin + '/consultant.html?token=' + data.token;
+    document.getElementById('q-qr').src =
+      'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrData);
+
+    await updateQueuePosition(data);
+    showState('queue');
+    subscribeToCheckin();
+  }
+
+  async function updateQueuePosition(currentData) {
+    // Count people waiting before this check-in
+    var { count } = await db.from('checkins')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_slug', storeSlug)
+      .eq('status', 'waiting')
+      .lt('created_at', currentData ? currentData.created_at : new Date().toISOString());
+
+    var ahead = count || 0;
+    document.getElementById('q-number').textContent = ahead;
+    document.getElementById('q-label').innerHTML =
+      ahead === 0
+        ? '<span>You\'re next!</span>'
+        : '<span>' + ahead + '</span> ' + (ahead === 1 ? 'person' : 'people') + ' ahead of you';
+  }
+
+  // ---- Realtime ----
+  function subscribeToCheckin() {
+    if (channel) return;
+    channel = db.channel('checkin-' + checkinId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'checkins',
+        filter: 'id=eq.' + checkinId
+      }, function(payload) {
+        handleCheckinState(payload.new);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'checkins',
+        filter: 'store_slug=eq.' + storeSlug
+      }, async function() {
+        // Refresh queue position when anything changes in the store
+        if (document.getElementById('state-queue').classList.contains('active')) {
+          var { data } = await db.from('checkins').select('*').eq('id', checkinId).single();
+          if (data) await updateQueuePosition(data);
+        }
+      })
+      .subscribe();
+  }
+
+  // ---- UI ----
+  function showState(name) {
+    document.querySelectorAll('.state').forEach(function(el) {
+      el.classList.remove('active');
+    });
+    document.getElementById('state-' + name).classList.add('active');
+  }
+
+  init();
+</script>
+
+</body>
+</html>
