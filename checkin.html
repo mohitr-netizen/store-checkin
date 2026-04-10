@@ -4,132 +4,250 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>CaratLane Check-in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
+    :root {
+      --purple:       #8863FB;
+      --purple-90:    #9574FB;
+      --purple-30:    #E5DDFF;
+      --purple-light: #F5F1FF;
+      --brand-dark:   #4F3267;
+      --brand-darker: #35214A;
+      --gray-900:     #101828;
+      --gray-600:     #475467;
+      --neutral-40:   #AAAAAA;
+      --input-bg:     #F6F3F9;
+      --success:      #05A702;
+      --error:        #CE1010;
+      --radius-btn:   12px;
+      --radius-card:  16px;
+      --radius-input: 12px;
+      --shadow-card:  0px 12px 16px -4px rgba(16,24,40,0.08), 0px 4px 6px -2px rgba(16,24,40,0.03);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f3ff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--purple-light);
       min-height: 100vh;
     }
+
+    /* ---- Header ---- */
     header {
-      background: #8863FB;
+      background: var(--brand-dark);
       color: white;
       padding: 20px;
       text-align: center;
     }
-    header .store-name { font-size: 13px; opacity: 0.8; margin-bottom: 4px; }
-    header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+    header .store-name {
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.65;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-mark svg { width: 28px; height: 28px; }
+    .logo-mark span {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
 
-    .wrap { max-width: 480px; margin: 0 auto; padding: 32px 20px 48px; }
+    /* ---- Layout ---- */
+    .wrap { max-width: 480px; margin: 0 auto; padding: 32px 20px 64px; }
 
-    /* ---- States ---- */
     .state { display: none; }
     .state.active { display: block; }
 
-    /* Form */
+    /* ---- Form ---- */
     .welcome-text { text-align: center; margin-bottom: 28px; }
-    .welcome-text h2 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
-    .welcome-text p  { font-size: 14px; color: #888; }
-
-    .field { margin-bottom: 16px; }
-    .field input {
-      width: 100%; padding: 16px;
-      font-size: 16px; border: 2px solid #e8e2ff;
-      border-radius: 12px; outline: none;
-      background: white; color: #1a1a2e;
+    .welcome-text h2 {
+      font-size: 22px; font-weight: 700;
+      color: var(--brand-dark); margin-bottom: 6px;
     }
-    .field input:focus { border-color: #8863FB; }
-    .field input::placeholder { color: #bbb; }
+    .welcome-text p { font-size: 14px; color: var(--gray-600); }
+
+    .field { margin-bottom: 14px; }
+    .field input {
+      width: 100%; height: 48px; padding: 0 16px;
+      font-size: 16px; font-family: inherit;
+      border: 2px solid transparent;
+      border-radius: var(--radius-input);
+      outline: none;
+      background: var(--input-bg);
+      color: var(--gray-900);
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--purple); }
+    .field input::placeholder { color: var(--neutral-40); }
+    .field input.error-field { border-color: var(--error); }
 
     .btn-primary {
-      width: 100%; padding: 18px;
-      background: #8863FB; color: white;
-      border: none; border-radius: 14px;
-      font-size: 17px; font-weight: 700;
+      width: 100%; height: 48px;
+      background: var(--purple); color: white;
+      border: none; border-radius: var(--radius-btn);
+      font-size: 16px; font-weight: 600; font-family: inherit;
       cursor: pointer; margin-top: 8px;
+      transition: background 0.15s;
     }
-    .btn-primary:active { opacity: 0.85; }
-    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-primary:active { background: var(--brand-dark); }
+    .btn-primary:disabled { background: var(--neutral-40); cursor: not-allowed; }
 
-    /* Queue */
-    .queue-card {
-      background: white; border-radius: 20px;
-      padding: 32px 24px; text-align: center;
-      box-shadow: 0 4px 24px rgba(136,99,251,0.1);
-      margin-bottom: 20px;
+    .error-msg {
+      background: #FFE1E3; border: 1px solid var(--error);
+      border-radius: 10px; padding: 12px 16px;
+      color: var(--error); font-size: 13px;
+      margin-top: 12px; display: none;
     }
-    .queue-card .hi { font-size: 18px; color: #555; margin-bottom: 4px; }
-    .queue-card .checked-in { font-size: 14px; color: #8863FB; font-weight: 600; margin-bottom: 28px; }
+
+    /* ---- Queue card ---- */
+    .queue-card {
+      background: white; border-radius: var(--radius-card);
+      padding: 32px 24px; text-align: center;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 16px;
+    }
+    .queue-card .hi {
+      font-size: 17px; font-weight: 600;
+      color: var(--brand-dark); margin-bottom: 10px;
+    }
+    .checked-in-badge {
+      display: inline-block;
+      background: var(--purple-30); color: var(--purple);
+      font-size: 12px; font-weight: 600;
+      padding: 4px 14px; border-radius: 30px;
+      margin-bottom: 28px;
+    }
 
     .queue-number {
       font-size: 80px; font-weight: 800;
-      color: #8863FB; line-height: 1;
+      color: var(--purple); line-height: 1;
       margin-bottom: 8px;
     }
-    .queue-label { font-size: 16px; color: #888; margin-bottom: 28px; }
-    .queue-label span { color: #1a1a2e; font-weight: 600; }
+    .queue-label {
+      font-size: 15px; color: var(--gray-600);
+      margin-bottom: 28px;
+    }
+    .queue-label span { color: var(--brand-dark); font-weight: 600; }
 
-    .divider { border: none; border-top: 1px solid #f0ebff; margin: 24px 0; }
+    .divider { border: none; border-top: 1px solid var(--purple-light); margin: 24px 0; }
 
     .qr-wrap { margin: 0 auto; }
-    .qr-wrap img { width: 180px; height: 180px; border-radius: 12px; }
-    .qr-hint { font-size: 12px; color: #aaa; margin-top: 10px; }
+    .qr-wrap img { width: 172px; height: 172px; border-radius: 10px; }
+    .qr-hint { font-size: 12px; color: var(--neutral-40); margin-top: 8px; }
 
     .refresh-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      font-size: 12px; color: #aaa; margin-top: 20px;
+      font-size: 12px; color: var(--neutral-40); margin-top: 18px;
     }
     .dot {
-      width: 7px; height: 7px; background: #8863FB;
+      width: 7px; height: 7px; background: var(--purple);
       border-radius: 50%; animation: pulse 2s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* Leave queue link */
+    .btn-leave {
+      display: block; width: 100%; text-align: center;
+      background: none; border: none;
+      font-size: 13px; font-weight: 500; font-family: inherit;
+      color: var(--neutral-40); cursor: pointer;
+      padding: 8px; margin-top: 4px;
+      text-decoration: underline;
+    }
+    .btn-leave:active { color: var(--error); }
+
+    /* Leave toast */
+    #leave-toast {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%);
+      background: var(--brand-darker); color: white;
+      padding: 14px 20px;
+      border-radius: 14px;
+      display: flex; align-items: center; gap: 14px;
+      font-size: 14px; font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      z-index: 999;
+      white-space: nowrap;
+      display: none;
+    }
+    #leave-toast .toast-text { flex: 1; }
+    #leave-toast .btn-undo {
+      background: var(--purple); color: white;
+      border: none; border-radius: 8px;
+      padding: 6px 14px; font-size: 13px; font-weight: 700;
+      font-family: inherit; cursor: pointer;
     }
 
-    /* In Progress */
+    /* ---- In Progress ---- */
     .served-card {
-      background: white; border-radius: 20px;
+      background: white; border-radius: var(--radius-card);
       padding: 40px 24px; text-align: center;
-      box-shadow: 0 4px 24px rgba(39,174,96,0.12);
-      border-top: 4px solid #27ae60;
+      box-shadow: var(--shadow-card);
+      border-top: 4px solid var(--success);
     }
-    .served-icon { font-size: 56px; margin-bottom: 16px; }
-    .served-card h2 { font-size: 24px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
-    .served-card p  { font-size: 15px; color: #666; line-height: 1.6; }
-    .consultant-name { color: #8863FB; font-weight: 600; }
+    .served-icon { font-size: 52px; margin-bottom: 16px; }
+    .served-card h2 {
+      font-size: 22px; font-weight: 700;
+      color: var(--brand-dark); margin-bottom: 10px;
+    }
+    .served-card p { font-size: 15px; color: var(--gray-600); line-height: 1.6; }
+    .consultant-name { color: var(--purple); font-weight: 600; }
 
-    /* Completed */
+    /* ---- Completed ---- */
     .thanks-card {
-      background: white; border-radius: 20px;
+      background: white; border-radius: var(--radius-card);
       padding: 40px 24px; text-align: center;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-card);
     }
-    .thanks-card .icon { font-size: 56px; margin-bottom: 16px; }
-    .thanks-card h2 { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; }
-    .thanks-card p  { font-size: 14px; color: #888; }
+    .thanks-card .icon { font-size: 52px; margin-bottom: 16px; }
+    .thanks-card h2 {
+      font-size: 20px; font-weight: 700;
+      color: var(--brand-dark); margin-bottom: 10px;
+    }
+    .thanks-card p { font-size: 14px; color: var(--gray-600); }
 
-    /* Error */
-    .error-msg { background: #fff0f0; border: 1px solid #ffcdd2; border-radius: 10px; padding: 14px 16px; color: #c0392b; font-size: 14px; margin-top: 12px; display: none; }
-
-    /* Store not found */
-    .not-found { text-align: center; padding: 60px 20px; color: #888; }
-    .not-found h2 { font-size: 20px; color: #1a1a2e; margin-bottom: 8px; }
+    /* ---- Not found / loading ---- */
+    .not-found {
+      text-align: center; padding: 60px 20px;
+      color: var(--gray-600);
+    }
+    .not-found h2 {
+      font-size: 20px; font-weight: 700;
+      color: var(--brand-dark); margin-bottom: 8px;
+    }
   </style>
 </head>
 <body>
 
 <header>
   <div class="store-name" id="store-label">Loading...</div>
-  <h1>CaratLane</h1>
+  <div class="logo-mark">
+    <!-- Diamond icon -->
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="14,2 26,10 14,26 2,10" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="1.5"/>
+      <polygon points="14,2 26,10 14,13" fill="rgba(255,255,255,0.5)"/>
+      <polygon points="2,10 14,10 14,13" fill="rgba(255,255,255,0.3)"/>
+      <line x1="2" y1="10" x2="26" y2="10" stroke="white" stroke-width="1"/>
+    </svg>
+    <span>CaratLane</span>
+  </div>
 </header>
 
 <div class="wrap">
 
   <!-- STATE: Loading -->
-  <div id="state-loading" class="state active" style="text-align:center;padding:60px 0;color:#888;">
+  <div id="state-loading" class="state active" style="text-align:center;padding:60px 0;color:var(--neutral-40);">
     Loading...
   </div>
 
@@ -145,16 +263,13 @@
   <div id="state-form" class="state">
     <div class="welcome-text">
       <h2>Welcome!</h2>
-      <p>Check in to get started. We'll be with you shortly.</p>
+      <p>Check in and we'll be with you shortly.</p>
     </div>
     <div class="field">
-      <input type="text" id="inp-firstname" placeholder="First Name" autocomplete="given-name" />
+      <input type="text" id="inp-fullname" placeholder="Full Name" autocomplete="name" />
     </div>
     <div class="field">
-      <input type="text" id="inp-lastname" placeholder="Last Name" autocomplete="family-name" />
-    </div>
-    <div class="field">
-      <input type="tel" id="inp-phone" placeholder="Phone Number" autocomplete="tel" />
+      <input type="tel" id="inp-phone" placeholder="Mobile Number" autocomplete="tel" />
     </div>
     <button class="btn-primary" id="btn-checkin" onclick="submitCheckin()">Check In</button>
     <div class="error-msg" id="form-error"></div>
@@ -164,18 +279,19 @@
   <div id="state-queue" class="state">
     <div class="queue-card">
       <div class="hi" id="q-greeting">Hi there!</div>
-      <div class="checked-in">✓ You're checked in</div>
+      <div class="checked-in-badge">&#10003; Checked in</div>
       <div class="queue-number" id="q-number">0</div>
       <div class="queue-label" id="q-label"><span>0</span> people ahead of you</div>
       <hr class="divider" />
       <div class="qr-wrap">
         <img id="q-qr" src="" alt="Your check-in QR" />
-        <p class="qr-hint">Show this QR to your consultant</p>
+        <p class="qr-hint">Show this to your consultant</p>
       </div>
       <div class="refresh-badge">
-        <div class="dot"></div> Live queue updates
+        <div class="dot"></div> Live updates
       </div>
     </div>
+    <button class="btn-leave" id="btn-leave-queue" onclick="startLeaveQueue()">Leave Queue</button>
   </div>
 
   <!-- STATE: In Progress -->
@@ -198,6 +314,12 @@
 
 </div>
 
+<!-- Leave queue toast -->
+<div id="leave-toast">
+  <span class="toast-text" id="leave-toast-text">Leaving queue in 10s</span>
+  <button class="btn-undo" onclick="undoLeaveQueue()">Undo</button>
+</div>
+
 <script>
   var SUPABASE_URL = 'https://sazlkppprwoctfwjhfqj.supabase.co';
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhemxrcHBwcndvY3Rmd2poZnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTUyNDIsImV4cCI6MjA5MDYzMTI0Mn0.4x3tYIhvuvW8s0lcLdZlQsbKFpaZaAEJbWEEtpjgPZQ';
@@ -210,13 +332,17 @@
   var checkinToken = null;
   var channel      = null;
 
+  // Leave-queue timer state
+  var leaveTimer     = null;
+  var leaveCountdown = 0;
+  var leaveInterval  = null;
+
   // ---- Init ----
   async function init() {
     var params = new URLSearchParams(window.location.search);
     storeSlug  = params.get('store') || '';
 
     if (!storeSlug) {
-      // Try to resume from localStorage
       var saved = localStorage.getItem('cl_checkin');
       if (saved) {
         var data = JSON.parse(saved);
@@ -239,7 +365,6 @@
     document.getElementById('store-label').textContent = storeName;
     document.title = 'Check-in — ' + storeName;
 
-    // Check for saved check-in for this store
     var saved = localStorage.getItem('cl_checkin');
     if (saved) {
       var data = JSON.parse(saved);
@@ -262,29 +387,37 @@
 
   // ---- Submit ----
   async function submitCheckin() {
-    var firstName = document.getElementById('inp-firstname').value.trim();
-    var lastName  = document.getElementById('inp-lastname').value.trim();
+    var fullName  = document.getElementById('inp-fullname').value.trim();
     var phone     = document.getElementById('inp-phone').value.trim();
     var errorEl   = document.getElementById('form-error');
 
     errorEl.style.display = 'none';
+    document.getElementById('inp-fullname').classList.remove('error-field');
+    document.getElementById('inp-phone').classList.remove('error-field');
 
-    if (!firstName || !lastName || !phone) {
+    if (!fullName || !phone) {
       errorEl.textContent = 'Please fill in all fields.';
       errorEl.style.display = 'block';
+      if (!fullName) document.getElementById('inp-fullname').classList.add('error-field');
+      if (!phone)    document.getElementById('inp-phone').classList.add('error-field');
       return;
     }
+
+    // Split full name: first word = first_name, rest = last_name
+    var parts     = fullName.split(' ');
+    var firstName = parts[0];
+    var lastName  = parts.slice(1).join(' ') || '';
 
     var btn = document.getElementById('btn-checkin');
     btn.disabled = true;
     btn.textContent = 'Checking in...';
 
     var { data, error } = await db.from('checkins').insert({
-      store_slug: storeSlug,
-      first_name: firstName,
-      last_name:  lastName,
-      phone:      phone,
-      status:     'waiting',
+      store_slug:    storeSlug,
+      first_name:    firstName,
+      last_name:     lastName,
+      phone:         phone,
+      status:        'waiting',
       consultant_id: 'DallasTexas@caratlane.us'
     }).select().single();
 
@@ -313,6 +446,7 @@
     if (data.status === 'waiting') {
       showQueueState(data);
     } else if (data.status === 'in_progress') {
+      playChime();
       document.getElementById('ip-consultant').textContent = data.consultant_id || 'your consultant';
       showState('inprogress');
     } else if (data.status === 'completed') {
@@ -324,7 +458,6 @@
   async function showQueueState(data) {
     document.getElementById('q-greeting').textContent = 'Hi ' + data.first_name + '!';
 
-    // Generate QR
     var qrData = window.location.origin + '/consultant.html?token=' + data.token;
     document.getElementById('q-qr').src =
       'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrData);
@@ -335,7 +468,6 @@
   }
 
   async function updateQueuePosition(currentData) {
-    // Count people waiting before this check-in
     var { count } = await db.from('checkins')
       .select('*', { count: 'exact', head: true })
       .eq('store_slug', storeSlug)
@@ -348,6 +480,50 @@
       ahead === 0
         ? '<span>You\'re next!</span>'
         : '<span>' + ahead + '</span> ' + (ahead === 1 ? 'person' : 'people') + ' ahead of you';
+  }
+
+  // ---- Leave Queue ----
+  function startLeaveQueue() {
+    if (leaveTimer) return; // already running
+    leaveCountdown = 10;
+    updateLeaveToast();
+    document.getElementById('leave-toast').style.display = 'flex';
+
+    leaveInterval = setInterval(function() {
+      leaveCountdown--;
+      if (leaveCountdown <= 0) {
+        clearInterval(leaveInterval);
+        leaveInterval = null;
+        leaveTimer    = null;
+        document.getElementById('leave-toast').style.display = 'none';
+        confirmLeaveQueue();
+      } else {
+        updateLeaveToast();
+      }
+    }, 1000);
+
+    leaveTimer = leaveInterval;
+  }
+
+  function updateLeaveToast() {
+    document.getElementById('leave-toast-text').textContent =
+      'Leaving queue in ' + leaveCountdown + 's';
+  }
+
+  function undoLeaveQueue() {
+    if (leaveInterval) { clearInterval(leaveInterval); leaveInterval = null; }
+    leaveTimer = null;
+    document.getElementById('leave-toast').style.display = 'none';
+  }
+
+  async function confirmLeaveQueue() {
+    await db.from('checkins').update({
+      status:     'completed',
+      updated_at: new Date().toISOString()
+    }).eq('id', checkinId);
+
+    localStorage.removeItem('cl_checkin');
+    showState('completed');
   }
 
   // ---- Realtime ----
@@ -368,13 +544,41 @@
         table: 'checkins',
         filter: 'store_slug=eq.' + storeSlug
       }, async function() {
-        // Refresh queue position when anything changes in the store
         if (document.getElementById('state-queue').classList.contains('active')) {
           var { data } = await db.from('checkins').select('*').eq('id', checkinId).single();
           if (data) await updateQueuePosition(data);
         }
       })
       .subscribe();
+  }
+
+  // ---- Chime (Web Audio API) ----
+  function playChime() {
+    try {
+      var ctx  = new (window.AudioContext || window.webkitAudioContext)();
+      var gain = ctx.createGain();
+      gain.connect(ctx.destination);
+
+      function note(freq, startTime) {
+        var osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        osc.connect(gain);
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.5, startTime + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.7);
+
+        osc.start(startTime);
+        osc.stop(startTime + 0.7);
+      }
+
+      var now = ctx.currentTime;
+      note(880,  now);
+      note(1100, now + 0.32);
+    } catch(e) {
+      // Audio not available — silent fail
+    }
   }
 
   // ---- UI ----
