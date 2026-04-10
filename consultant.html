@@ -227,15 +227,12 @@
   <div class="jc-name" id="header-jc" onclick="changeConsultant()">...</div>
 </header>
 
-<div class="toolbar">
+<div class="toolbar" id="toolbar-store" style="display:none;">
   <select class="store-select" id="store-select" onchange="changeStore()">
     <option value="dallas">Dallas</option>
     <option value="edison">Edison</option>
     <option value="trunk-show">Trunk Show</option>
   </select>
-  <button class="btn-scan" onclick="openScanner()">Scan Customer QR</button>
-  <input type="file" id="file-input" accept="image/*" capture="environment" onchange="handleScan(event)" />
-  <canvas id="canvas"></canvas>
 </div>
 
 <div class="wrap">
@@ -287,17 +284,23 @@
 
   // ---- Init ----
   function init() {
-    // Check if opened with a token (from customer QR scan)
-    var params = new URLSearchParams(window.location.search);
-    var token  = params.get('token');
+    var params    = new URLSearchParams(window.location.search);
+    var storeParam = params.get('store');
+
+    if (storeParam && STORE_NAMES[storeParam]) {
+      // Store locked via URL — save it, hide the dropdown
+      storeSlug = storeParam;
+      localStorage.setItem('cl_store', storeSlug);
+    } else {
+      // No store in URL — show the dropdown so they can pick
+      document.getElementById('toolbar-store').style.display = 'flex';
+    }
 
     if (!consultantId) {
       document.getElementById('modal-consultant').style.display = 'flex';
-      if (token) localStorage.setItem('cl_pending_token', token);
     } else {
       document.getElementById('modal-consultant').style.display = 'none';
       setupDashboard();
-      if (token) handleTokenLookup(token);
     }
   }
 
