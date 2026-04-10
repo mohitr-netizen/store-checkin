@@ -306,6 +306,12 @@
 
   var db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  var STORE_DEFAULTS = {
+    'dallas':     'DallasAdmin',
+    'edison':     'EdisonAdmin',
+    'trunk-show': 'TrunkShowAdmin'
+  };
+
   var storeSlug    = '';
   var storeName    = '';
   var checkinId    = null;
@@ -403,7 +409,7 @@
       last_name:     lastName,
       phone:         '',
       status:        'waiting',
-      consultant_id: 'DallasTexas@caratlane.us'
+      consultant_id: STORE_DEFAULTS[storeSlug] || 'admin@caratlane.us'
     }).select().single();
 
     if (error) {

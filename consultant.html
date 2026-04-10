@@ -257,8 +257,7 @@
   <div class="modal">
     <h2>Who are you?</h2>
     <p>Enter your CaratLane email to get started.</p>
-    <input type="email" id="modal-email" placeholder="e.g. jc@caratlane.com"
-      value="DallasTexas@caratlane.us" />
+    <input type="email" id="modal-email" placeholder="e.g. jc@caratlane.com" />
     <button class="btn-primary" onclick="saveConsultant()">Continue</button>
   </div>
 </div>
@@ -278,6 +277,12 @@
     'dallas':     'CaratLane Dallas',
     'edison':     'CaratLane Edison',
     'trunk-show': 'CaratLane Trunk Show'
+  };
+
+  var STORE_DEFAULTS = {
+    'dallas':     'DallasAdmin',
+    'edison':     'EdisonAdmin',
+    'trunk-show': 'TrunkShowAdmin'
   };
 
   // ---- Init ----
@@ -427,7 +432,7 @@
   async function releaseCheckin(id) {
     var { error } = await db.from('checkins').update({
       status:        'waiting',
-      consultant_id: 'DallasTexas@caratlane.us',
+      consultant_id: STORE_DEFAULTS[storeSlug] || 'admin@caratlane.us',
       updated_at:    new Date().toISOString()
     }).eq('id', id);
 
