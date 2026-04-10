@@ -272,6 +272,7 @@
   var consultantId = localStorage.getItem('cl_consultant') || '';
   var storeSlug    = localStorage.getItem('cl_store') || 'dallas';
   var channel      = null;
+  var pollInterval = null;
 
   var STORE_NAMES = {
     'dallas':     'CaratLane Dallas',
@@ -318,6 +319,7 @@
     updateHeader();
     loadQueue();
     subscribeRealtime();
+    startPolling();
   }
 
   function updateHeader() {
@@ -331,8 +333,10 @@
     localStorage.setItem('cl_store', storeSlug);
     updateHeader();
     if (channel) { db.removeChannel(channel); channel = null; }
+    stopPolling();
     loadQueue();
     subscribeRealtime();
+    startPolling();
   }
 
   // ---- Load Queue ----
@@ -484,7 +488,7 @@
 
   // ---- Realtime ----
   function subscribeRealtime() {
-    channel = db.channel('consultant-' + storeSlug)
+    channel = db.channel('consultant-' + storeSlug + '-' + Date.now())
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -493,8 +497,31 @@
       }, function() {
         loadQueue();
       })
-      .subscribe();
+      .subscribe(function(status) {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          // Realtime failed — polling covers it, try reconnecting after 10s
+          setTimeout(function() {
+            if (channel) { db.removeChannel(channel); channel = null; }
+            subscribeRealtime();
+          }, 10000);
+        }
+      });
   }
+
+  // ---- Polling fallback (every 5s) ----
+  function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(loadQueue, 5000);
+  }
+
+  function stopPolling() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  }
+
+  // ---- Reload on tab focus (consultant switches back to this tab) ----
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') loadQueue();
+  });
 
   // ---- Feedback toast ----
   function showFeedback(msg, duration) {
