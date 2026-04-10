@@ -254,10 +254,7 @@
       <p>Check in and we'll be with you shortly.</p>
     </div>
     <div class="field">
-      <input type="text" id="inp-fullname" placeholder="Full Name" autocomplete="name" />
-    </div>
-    <div class="field">
-      <input type="tel" id="inp-phone" placeholder="Mobile Number" autocomplete="tel" />
+      <input type="text" id="inp-fullname" placeholder="Your Name" autocomplete="name" />
     </div>
     <button class="btn-primary" id="btn-checkin" onclick="submitCheckin()">Check In</button>
     <div class="error-msg" id="form-error"></div>
@@ -376,18 +373,15 @@
   // ---- Submit ----
   async function submitCheckin() {
     var fullName  = document.getElementById('inp-fullname').value.trim();
-    var phone     = document.getElementById('inp-phone').value.trim();
     var errorEl   = document.getElementById('form-error');
 
     errorEl.style.display = 'none';
     document.getElementById('inp-fullname').classList.remove('error-field');
-    document.getElementById('inp-phone').classList.remove('error-field');
 
-    if (!fullName || !phone) {
-      errorEl.textContent = 'Please fill in all fields.';
+    if (!fullName) {
+      errorEl.textContent = 'Please enter your name.';
       errorEl.style.display = 'block';
-      if (!fullName) document.getElementById('inp-fullname').classList.add('error-field');
-      if (!phone)    document.getElementById('inp-phone').classList.add('error-field');
+      document.getElementById('inp-fullname').classList.add('error-field');
       return;
     }
 
@@ -407,7 +401,7 @@
       store_slug:    storeSlug,
       first_name:    firstName,
       last_name:     lastName,
-      phone:         phone,
+      phone:         '',
       status:        'waiting',
       consultant_id: 'DallasTexas@caratlane.us'
     }).select().single();
