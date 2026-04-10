@@ -56,7 +56,7 @@
       align-items: center;
       gap: 8px;
     }
-    .logo-mark svg { width: 28px; height: 28px; }
+    .logo-mark img { width: 32px; height: 32px; border-radius: 4px; }
     .logo-mark span {
       font-size: 22px;
       font-weight: 700;
@@ -139,12 +139,6 @@
       margin-bottom: 28px;
     }
     .queue-label span { color: var(--brand-dark); font-weight: 600; }
-
-    .divider { border: none; border-top: 1px solid var(--purple-light); margin: 24px 0; }
-
-    .qr-wrap { margin: 0 auto; }
-    .qr-wrap img { width: 172px; height: 172px; border-radius: 10px; }
-    .qr-hint { font-size: 12px; color: var(--neutral-40); margin-top: 8px; }
 
     .refresh-badge {
       display: inline-flex; align-items: center; gap: 6px;
@@ -233,13 +227,7 @@
 <header>
   <div class="store-name" id="store-label">Loading...</div>
   <div class="logo-mark">
-    <!-- Diamond icon -->
-    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="14,2 26,10 14,26 2,10" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="1.5"/>
-      <polygon points="14,2 26,10 14,13" fill="rgba(255,255,255,0.5)"/>
-      <polygon points="2,10 14,10 14,13" fill="rgba(255,255,255,0.3)"/>
-      <line x1="2" y1="10" x2="26" y2="10" stroke="white" stroke-width="1"/>
-    </svg>
+    <img src="https://cdn.caratlane.com/media/static/images/V4/2024/CL/11_NOV/Banner/logo/logo.jpg" alt="CaratLane" />
     <span>CaratLane</span>
   </div>
 </header>
@@ -282,11 +270,6 @@
       <div class="checked-in-badge">&#10003; Checked in</div>
       <div class="queue-number" id="q-number">0</div>
       <div class="queue-label" id="q-label"><span>0</span> people ahead of you</div>
-      <hr class="divider" />
-      <div class="qr-wrap">
-        <img id="q-qr" src="" alt="Your check-in QR" />
-        <p class="qr-hint">Show this to your consultant</p>
-      </div>
       <div class="refresh-badge">
         <div class="dot"></div> Live updates
       </div>
@@ -330,7 +313,12 @@
   var storeName    = '';
   var checkinId    = null;
   var checkinToken = null;
-  var channel      = null;
+  var statusChannel = null;
+  var queueChannel  = null;
+  var pollInterval  = null;
+
+  // Audio — must be created during a user gesture
+  var audioCtx = null;
 
   // Leave-queue timer state
   var leaveTimer     = null;
@@ -408,6 +396,9 @@
     var firstName = parts[0];
     var lastName  = parts.slice(1).join(' ') || '';
 
+    // Unlock audio during this user gesture so chime can fire later
+    unlockAudio();
+
     var btn = document.getElementById('btn-checkin');
     btn.disabled = true;
     btn.textContent = 'Checking in...';
@@ -438,7 +429,6 @@
     }));
 
     handleCheckinState(data);
-    subscribeToCheckin();
   }
 
   // ---- State handler ----
@@ -457,14 +447,10 @@
 
   async function showQueueState(data) {
     document.getElementById('q-greeting').textContent = 'Hi ' + data.first_name + '!';
-
-    var qrData = window.location.origin + '/consultant.html?token=' + data.token;
-    document.getElementById('q-qr').src =
-      'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrData);
-
     await updateQueuePosition(data);
     showState('queue');
     subscribeToCheckin();
+    startPolling();
   }
 
   async function updateQueuePosition(currentData) {
@@ -526,10 +512,12 @@
     showState('completed');
   }
 
-  // ---- Realtime ----
+  // ---- Realtime (two separate channels to avoid filter conflict) ----
   function subscribeToCheckin() {
-    if (channel) return;
-    channel = db.channel('checkin-' + checkinId)
+    if (statusChannel) return;
+
+    // Watch this specific checkin for status changes
+    statusChannel = db.channel('status-' + checkinId)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -538,6 +526,10 @@
       }, function(payload) {
         handleCheckinState(payload.new);
       })
+      .subscribe();
+
+    // Watch the store queue for position updates
+    queueChannel = db.channel('queue-' + storeSlug)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -552,33 +544,57 @@
       .subscribe();
   }
 
-  // ---- Chime (Web Audio API) ----
-  function playChime() {
+  // ---- Polling fallback (every 5s in case realtime lags) ----
+  function startPolling() {
+    if (pollInterval) return;
+    pollInterval = setInterval(async function() {
+      if (!checkinId) return;
+      var { data } = await db.from('checkins').select('*').eq('id', checkinId).single();
+      if (!data) return;
+      if (data.status !== 'waiting') {
+        clearInterval(pollInterval); pollInterval = null;
+        handleCheckinState(data);
+      } else if (document.getElementById('state-queue').classList.contains('active')) {
+        await updateQueuePosition(data);
+      }
+    }, 5000);
+  }
+
+  // ---- Chime ----
+  // AudioContext must be created inside a user gesture (Check In tap).
+  // We store it globally so playChime() can reuse it later.
+  function unlockAudio() {
     try {
-      var ctx  = new (window.AudioContext || window.webkitAudioContext)();
-      var gain = ctx.createGain();
-      gain.connect(ctx.destination);
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch(e) {}
+  }
 
-      function note(freq, startTime) {
-        var osc = ctx.createOscillator();
+  function playChime() {
+    if (!audioCtx) return;
+    try {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      function note(freq, delay) {
+        var osc  = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        var t    = audioCtx.currentTime + delay;
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
+        osc.frequency.setValueAtTime(freq, t);
         osc.connect(gain);
-
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(0.5, startTime + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.7);
-
-        osc.start(startTime);
-        osc.stop(startTime + 0.7);
+        gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        osc.start(t);
+        osc.stop(t + 0.8);
       }
 
-      var now = ctx.currentTime;
-      note(880,  now);
-      note(1100, now + 0.32);
-    } catch(e) {
-      // Audio not available — silent fail
-    }
+      note(880,  0);
+      note(1100, 0.35);
+    } catch(e) {}
   }
 
   // ---- UI ----
