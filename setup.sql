@@ -43,3 +43,6 @@ create policy "public_checkins_update" on checkins for update using (true);
 
 -- Enable Realtime
 alter publication supabase_realtime add table checkins;
+
+-- Token number (daily, per-location) — run once
+alter table checkins add column if not exists token_number int;

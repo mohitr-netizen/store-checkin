@@ -129,14 +129,20 @@
       margin-bottom: 28px;
     }
 
-    .queue-number {
+    .token-number {
       font-size: 80px; font-weight: 800;
       color: var(--purple); line-height: 1;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
+    .token-label {
+      font-size: 12px; font-weight: 500;
+      color: var(--neutral-40); text-transform: uppercase;
+      letter-spacing: 0.6px; margin-bottom: 20px;
+    }
+    .divider { border: none; border-top: 1px solid var(--purple-light); margin: 20px 0; }
     .queue-label {
-      font-size: 15px; color: var(--gray-600);
-      margin-bottom: 28px;
+      font-size: 14px; color: var(--gray-600);
+      margin-bottom: 20px;
     }
     .queue-label span { color: var(--brand-dark); font-weight: 600; }
 
@@ -256,6 +262,9 @@
     <div class="field">
       <input type="text" id="inp-fullname" placeholder="Your Name" autocomplete="name" />
     </div>
+    <div class="field">
+      <input type="tel" id="inp-phone" placeholder="Mobile (optional)" autocomplete="tel" />
+    </div>
     <button class="btn-primary" id="btn-checkin" onclick="submitCheckin()">Check In</button>
     <div class="error-msg" id="form-error"></div>
   </div>
@@ -265,8 +274,10 @@
     <div class="queue-card">
       <div class="hi" id="q-greeting">Hi there!</div>
       <div class="checked-in-badge">&#10003; Checked in</div>
-      <div class="queue-number" id="q-number">0</div>
-      <div class="queue-label" id="q-label"><span>0</span> people ahead of you</div>
+      <div class="token-number" id="q-token">#—</div>
+      <div class="token-label">Your token number</div>
+      <hr class="divider" />
+      <div class="queue-label" id="q-label"><span>Calculating...</span></div>
       <div class="refresh-badge">
         <div class="dot"></div> Live updates
       </div>
@@ -396,6 +407,8 @@
     var firstName = parts[0];
     var lastName  = parts.slice(1).join(' ') || '';
 
+    var phone = document.getElementById('inp-phone').value.trim();
+
     // Unlock audio during this user gesture so chime can fire later
     unlockAudio();
 
@@ -403,13 +416,22 @@
     btn.disabled = true;
     btn.textContent = 'Checking in...';
 
+    // Assign daily token number: count today's check-ins for this store + 1
+    var todayUTC = new Date().toISOString().split('T')[0];
+    var { count: todayCount } = await db.from('checkins')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_slug', storeSlug)
+      .gte('created_at', todayUTC + 'T00:00:00.000Z');
+    var tokenNumber = (todayCount || 0) + 1;
+
     var { data, error } = await db.from('checkins').insert({
       store_slug:    storeSlug,
       first_name:    firstName,
       last_name:     lastName,
-      phone:         '',
+      phone:         phone,
       status:        'waiting',
-      consultant_id: STORE_DEFAULTS[storeSlug] || 'admin@caratlane.us'
+      consultant_id: STORE_DEFAULTS[storeSlug] || 'admin@caratlane.us',
+      token_number:  tokenNumber
     }).select().single();
 
     if (error) {
@@ -447,6 +469,7 @@
 
   async function showQueueState(data) {
     document.getElementById('q-greeting').textContent = 'Hi ' + data.first_name + '!';
+    document.getElementById('q-token').textContent = '#' + (data.token_number || '—');
     await updateQueuePosition(data);
     showState('queue');
     subscribeToCheckin();
@@ -461,7 +484,6 @@
       .lt('created_at', currentData ? currentData.created_at : new Date().toISOString());
 
     var ahead = count || 0;
-    document.getElementById('q-number').textContent = ahead;
     document.getElementById('q-label').innerHTML =
       ahead === 0
         ? '<span>You\'re next!</span>'

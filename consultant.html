@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>CaratLane — Consultant Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -59,21 +58,6 @@
       color: #1a1a2e;
       outline: none;
     }
-    .btn-scan {
-      padding: 10px 16px;
-      background: #8863FB;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .btn-scan:active { opacity: 0.85; }
-
-    #file-input { display: none; }
-    canvas { display: none; }
 
     .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
 
@@ -153,23 +137,6 @@
       cursor: pointer;
     }
 
-    /* Scan feedback */
-    #scan-feedback {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1a1a2e;
-      color: white;
-      padding: 14px 24px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 999;
-      display: none;
-      white-space: nowrap;
-    }
-
     /* Consultant modal */
     .modal-overlay {
       position: fixed; inset: 0;
@@ -189,12 +156,17 @@
     }
     .modal h2 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
     .modal p  { font-size: 14px; color: #888; margin-bottom: 20px; }
-    .modal input {
+    .modal select {
       width: 100%; padding: 14px 16px;
       font-size: 15px; border: 2px solid #e8e2ff;
       border-radius: 12px; outline: none; margin-bottom: 16px;
+      background: white; color: #1a1a2e; cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238863FB' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
     }
-    .modal input:focus { border-color: #8863FB; }
+    .modal select:focus { border-color: #8863FB; }
     .modal .btn-primary {
       width: 100%; padding: 16px;
       background: #8863FB; color: white;
@@ -247,14 +219,14 @@
   </div>
 </div>
 
-<div id="scan-feedback"></div>
-
 <!-- Consultant modal -->
 <div class="modal-overlay" id="modal-consultant">
   <div class="modal">
     <h2>Who are you?</h2>
-    <p>Enter your CaratLane email to get started.</p>
-    <input type="email" id="modal-email" placeholder="e.g. jc@caratlane.com" />
+    <p>Select your name to get started.</p>
+    <select id="modal-consultant-select">
+      <option value="">Select your name</option>
+    </select>
     <button class="btn-primary" onclick="saveConsultant()">Continue</button>
   </div>
 </div>
@@ -277,9 +249,15 @@
   };
 
   var STORE_DEFAULTS = {
-    'dallas':     'DallasAdmin',
-    'edison':     'EdisonAdmin',
-    'trunk-show': 'TrunkShowAdmin'
+    'dallas':     'DallasAdmin1',
+    'edison':     'EdisonAdmin1',
+    'trunk-show': 'TrunkShowAdmin1'
+  };
+
+  var STORE_CONSULTANTS = {
+    'dallas':     ['DallasAdmin1', 'DallasAdmin2'],
+    'edison':     ['EdisonAdmin1', 'EdisonAdmin2'],
+    'trunk-show': ['TrunkShowAdmin1', 'TrunkShowAdmin2']
   };
 
   // ---- Init ----
@@ -288,36 +266,48 @@
     var storeParam = params.get('store');
 
     if (storeParam && STORE_NAMES[storeParam]) {
-      // Store locked via URL — save it, hide the dropdown
       storeSlug = storeParam;
       localStorage.setItem('cl_store', storeSlug);
     } else {
-      // No store in URL — show the dropdown so they can pick
       document.getElementById('toolbar-store').style.display = 'flex';
     }
 
-    if (!consultantId) {
-      document.getElementById('modal-consultant').style.display = 'flex';
-    } else {
+    // Populate consultant dropdown for this store
+    populateConsultantSelect();
+
+    // If saved consultant is valid for this store, skip modal
+    var validIds = STORE_CONSULTANTS[storeSlug] || [];
+    if (consultantId && validIds.indexOf(consultantId) !== -1) {
       document.getElementById('modal-consultant').style.display = 'none';
       setupDashboard();
+    } else {
+      consultantId = '';
+      localStorage.removeItem('cl_consultant');
+      document.getElementById('modal-consultant').style.display = 'flex';
     }
   }
 
+  function populateConsultantSelect() {
+    var opts = STORE_CONSULTANTS[storeSlug] || [];
+    var sel  = document.getElementById('modal-consultant-select');
+    sel.innerHTML = '<option value="">Select your name</option>'
+      + opts.map(function(id) {
+          return '<option value="' + id + '">' + id + '</option>';
+        }).join('');
+    if (consultantId) sel.value = consultantId;
+  }
+
   function saveConsultant() {
-    var email = document.getElementById('modal-email').value.trim();
-    if (!email) return;
-    consultantId = email;
-    localStorage.setItem('cl_consultant', email);
+    var selected = document.getElementById('modal-consultant-select').value;
+    if (!selected) return;
+    consultantId = selected;
+    localStorage.setItem('cl_consultant', selected);
     document.getElementById('modal-consultant').style.display = 'none';
     setupDashboard();
-
-    var pending = localStorage.getItem('cl_pending_token');
-    if (pending) { localStorage.removeItem('cl_pending_token'); handleTokenLookup(pending); }
   }
 
   function changeConsultant() {
-    document.getElementById('modal-email').value = consultantId;
+    populateConsultantSelect();
     document.getElementById('modal-consultant').style.display = 'flex';
   }
 
@@ -398,13 +388,16 @@
               + '<button class="btn-release" onclick="releaseCheckin(\'' + c.id + '\')">Release</button>';
     }
 
-    var posTag = position ? '<span style="font-size:11px;background:#f5f3ff;color:#8863FB;padding:2px 8px;border-radius:8px;font-weight:600;">#' + position + '</span> ' : '';
+    var tokenTag = c.token_number
+      ? '<span style="font-size:12px;background:#f5f3ff;color:#8863FB;padding:3px 10px;border-radius:8px;font-weight:700;margin-right:6px;">#' + c.token_number + '</span>'
+      : '';
+    var phoneRow = c.phone ? '<div class="card-phone">' + c.phone + '</div>' : '';
     var consultantTag = type === 'in_progress' ? '<div class="card-consultant">With: ' + c.consultant_id + '</div>' : '';
 
     return '<div class="checkin-card ' + type + '">'
       + '<div class="card-info">'
-      + '<div class="card-name">' + posTag + name + '</div>'
-      + '<div class="card-phone">' + c.phone + '</div>'
+      + '<div class="card-name">' + tokenTag + name + '</div>'
+      + phoneRow
       + '<div class="card-time">' + waitStr + '</div>'
       + consultantTag
       + '</div>'
@@ -440,58 +433,6 @@
     }).eq('id', id);
 
     if (!error) loadQueue();
-  }
-
-  // ---- Token lookup (from QR scan) ----
-  async function handleTokenLookup(token) {
-    var { data, error } = await db.from('checkins').select('*').eq('token', token).single();
-    if (error || !data) { showFeedback('Check-in not found', 3000); return; }
-
-    if (data.status === 'waiting') {
-      await takeCheckin(data.id);
-      showFeedback('Taken: ' + data.first_name + ' ' + data.last_name, 3000);
-    } else if (data.status === 'in_progress') {
-      showFeedback(data.first_name + ' is already with ' + data.consultant_id, 3000);
-    } else {
-      showFeedback(data.first_name + ' is already checked out', 3000);
-    }
-  }
-
-  // ---- QR Scanner ----
-  function openScanner() {
-    document.getElementById('file-input').value = '';
-    document.getElementById('file-input').click();
-  }
-
-  function handleScan(event) {
-    var file = event.target.files[0];
-    if (!file) return;
-
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var img = new Image();
-      img.onload = function() {
-        var canvas = document.getElementById('canvas');
-        var ctx    = canvas.getContext('2d');
-        canvas.width  = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-
-        if (code) {
-          // Extract token from URL or use raw value
-          var token = code.data;
-          var match = token.match(/[?&]token=([^&]+)/);
-          if (match) token = match[1];
-          handleTokenLookup(token);
-        } else {
-          showFeedback('Could not read QR code. Try again.', 2500);
-        }
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
   }
 
   // ---- Realtime ----
@@ -530,14 +471,6 @@
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') loadQueue();
   });
-
-  // ---- Feedback toast ----
-  function showFeedback(msg, duration) {
-    var el = document.getElementById('scan-feedback');
-    el.textContent = msg;
-    el.style.display = 'block';
-    setTimeout(function() { el.style.display = 'none'; }, duration || 2500);
-  }
 
   init();
 </script>
