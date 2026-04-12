@@ -483,11 +483,11 @@
       .eq('status', 'waiting')
       .lt('created_at', currentData ? currentData.created_at : new Date().toISOString());
 
-    var ahead = count || 0;
+    var ahead    = count || 0;
+    var position = ahead + 1;
+    var suffix   = position === 1 ? 'st' : position === 2 ? 'nd' : position === 3 ? 'rd' : 'th';
     document.getElementById('q-label').innerHTML =
-      ahead === 0
-        ? '<span>You\'re next!</span>'
-        : '<span>' + ahead + '</span> ' + (ahead === 1 ? 'person' : 'people') + ' ahead of you';
+      'You are <span>' + position + suffix + '</span> in line';
   }
 
   // ---- Leave Queue ----
