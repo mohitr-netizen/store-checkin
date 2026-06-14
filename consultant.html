@@ -417,11 +417,7 @@
   }
 
   async function checkoutCheckin(id) {
-    var { error } = await db.from('checkins').update({
-      status:     'completed',
-      updated_at: new Date().toISOString()
-    }).eq('id', id);
-
+    var { error } = await db.rpc('checkout_customer', { checkin_id: id });
     if (!error) loadQueue();
   }
 
